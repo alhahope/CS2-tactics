@@ -871,6 +871,34 @@ footer span {
   pointer-events: none;
 }
 
+.route-svg-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.route-path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+  filter:
+    drop-shadow(0 0 2px rgba(0, 0, 0, 0.95))
+    drop-shadow(0 0 8px rgba(255, 255, 255, 0.16));
+  opacity: 0.94;
+  vector-effect: non-scaling-stroke;
+}
+
+.route-end-dot {
+  stroke: rgba(0, 0, 0, 0.92);
+  stroke-width: 0.42;
+  vector-effect: non-scaling-stroke;
+}
+
 .route-segment {
   position: absolute;
   z-index: 6;
@@ -970,6 +998,28 @@ footer span {
 
 .radar.has-map-image .radar-point:hover span {
   opacity: 1;
+}
+
+.radar.has-map-image .radar-point.calibrated {
+  width: 14px;
+  height: 14px;
+  border-color: rgba(0, 0, 0, 0.9);
+  background: #fff8dc;
+  box-shadow:
+    0 0 0 3px rgba(0, 0, 0, 0.18),
+    0 0 12px rgba(255, 248, 220, 0.28);
+}
+
+.radar.has-map-image .radar-point.calibrated.site {
+  background: var(--amber);
+}
+
+.radar.has-map-image .radar-point.calibrated.spawn {
+  background: var(--cyan);
+}
+
+.radar.has-map-image .radar-point.calibrated.danger {
+  background: var(--red);
 }
 
 .route-legend {

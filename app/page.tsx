@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Side = "T" | "CT";
 type RoundType = "长枪局" | "半起局" | "ECO";
@@ -41,6 +41,30 @@ type RouteWaypoint = {
 type RouteGraph = {
   nodes: Record<string, [number, number]>;
   edges: [string, string][];
+};
+
+type RasterCell = {
+  col: number;
+  row: number;
+};
+
+type RouteMask = {
+  size: number;
+  walkable: Uint8Array;
+};
+
+type ImageRoutePath = {
+  label: string;
+  color: string;
+  points: RouteWaypoint[];
+};
+
+type ImageRouteMarker = {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  kind?: Point["kind"];
 };
 
 type Route = {
@@ -94,6 +118,8 @@ const roundTypes: RoundType[] = ["长枪局", "半起局", "ECO"];
 const goals: Goal[] = ["爆点", "控图", "默认", "反清"];
 const sides: Side[] = ["T", "CT"];
 const routeColors = ["#ff7a3d", "#44d7a8", "#7cc9ff", "#f6d65f"];
+const rasterGridSize = 128;
+const routeMaskCache = new Map<string, Promise<RouteMask | null>>();
 
 const point = (id: string, label: string, x: number, y: number, kind: Point["kind"] = "lane"): Point => ({ id, label, x, y, kind });
 const area = (
@@ -2428,10 +2454,298 @@ function routeSegments(map: MapPlan, route: Route) {
   return pathPoints.flatMap((item, index, array) => index < array.length - 1 ? [[item, array[index + 1]] as const] : []);
 }
 
+function isWalkableRadarPixel(r: number, g: number, b: number, a: number) {
+  if (a < 24) return false;
+  if (r + g + b < 38) return false;
+  if (r > 185 && g > 185 && b > 185) return false;
+  return true;
+}
+
+function getRouteMask(mapId: string) {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  const cached = routeMaskCache.get(mapId);
+  if (cached) return cached;
+
+  const promise = new Promise<RouteMask | null>((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = rasterGridSize;
+      canvas.height = rasterGridSize;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) {
+        resolve(null);
+        return;
+      }
+      context.drawImage(image, 0, 0, rasterGridSize, rasterGridSize);
+      const pixels = context.getImageData(0, 0, rasterGridSize, rasterGridSize).data;
+      const walkable = new Uint8Array(rasterGridSize * rasterGridSize);
+      for (let index = 0; index < walkable.length; index += 1) {
+        const pixelIndex = index * 4;
+        walkable[index] = isWalkableRadarPixel(
+          pixels[pixelIndex],
+          pixels[pixelIndex + 1],
+          pixels[pixelIndex + 2],
+          pixels[pixelIndex + 3],
+        ) ? 1 : 0;
+      }
+      resolve({ size: rasterGridSize, walkable });
+    };
+    image.onerror = () => resolve(null);
+    image.src = `./maps/${mapId}.png`;
+  });
+
+  routeMaskCache.set(mapId, promise);
+  return promise;
+}
+
+function rasterIndex(mask: RouteMask, cell: RasterCell) {
+  return cell.row * mask.size + cell.col;
+}
+
+function clampCell(value: number, size: number) {
+  return Math.max(0, Math.min(size - 1, Math.round(value)));
+}
+
+function pointToCell(mask: RouteMask, pointItem: Point) {
+  return {
+    col: clampCell(pointItem.x / 100 * (mask.size - 1), mask.size),
+    row: clampCell(pointItem.y / 100 * (mask.size - 1), mask.size),
+  };
+}
+
+function cellToWaypoint(mask: RouteMask, id: string, cell: RasterCell): RouteWaypoint {
+  return {
+    id,
+    x: (cell.col + 0.5) / mask.size * 100,
+    y: (cell.row + 0.5) / mask.size * 100,
+  };
+}
+
+function nearestWalkableCell(mask: RouteMask, cell: RasterCell) {
+  const startCol = clampCell(cell.col, mask.size);
+  const startRow = clampCell(cell.row, mask.size);
+  if (mask.walkable[startRow * mask.size + startCol]) return { col: startCol, row: startRow };
+
+  let best: RasterCell | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  const maxRadius = Math.ceil(mask.size * 0.18);
+  for (let radius = 1; radius <= maxRadius; radius += 1) {
+    for (let row = startRow - radius; row <= startRow + radius; row += 1) {
+      for (let col = startCol - radius; col <= startCol + radius; col += 1) {
+        if (row < 0 || col < 0 || row >= mask.size || col >= mask.size) continue;
+        if (Math.abs(row - startRow) !== radius && Math.abs(col - startCol) !== radius) continue;
+        if (!mask.walkable[row * mask.size + col]) continue;
+        const distance = Math.hypot(col - startCol, row - startRow);
+        if (distance < bestDistance) {
+          best = { col, row };
+          bestDistance = distance;
+        }
+      }
+    }
+    if (best) return best;
+  }
+
+  return { col: startCol, row: startRow };
+}
+
+function hasLineOfSight(mask: RouteMask, from: RasterCell, to: RasterCell) {
+  let x0 = from.col;
+  let y0 = from.row;
+  const x1 = to.col;
+  const y1 = to.row;
+  const dx = Math.abs(x1 - x0);
+  const sx = x0 < x1 ? 1 : -1;
+  const dy = -Math.abs(y1 - y0);
+  const sy = y0 < y1 ? 1 : -1;
+  let error = dx + dy;
+
+  while (true) {
+    if (!mask.walkable[y0 * mask.size + x0]) return false;
+    if (x0 === x1 && y0 === y1) return true;
+    const doubled = 2 * error;
+    if (doubled >= dy) {
+      error += dy;
+      x0 += sx;
+    }
+    if (doubled <= dx) {
+      error += dx;
+      y0 += sy;
+    }
+    if (x0 < 0 || y0 < 0 || x0 >= mask.size || y0 >= mask.size) return false;
+  }
+}
+
+function simplifyRasterPath(mask: RouteMask, cells: RasterCell[]) {
+  if (cells.length <= 2) return cells;
+  const simplified = [cells[0]];
+  let anchor = 0;
+  while (anchor < cells.length - 1) {
+    let next = cells.length - 1;
+    while (next > anchor + 1 && !hasLineOfSight(mask, cells[anchor], cells[next])) {
+      next -= 1;
+    }
+    simplified.push(cells[next]);
+    anchor = next;
+  }
+  return simplified;
+}
+
+function routePenalty(mask: RouteMask, col: number, row: number) {
+  let blocked = 0;
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      const nextCol = col + dx;
+      const nextRow = row + dy;
+      if (nextCol < 0 || nextRow < 0 || nextCol >= mask.size || nextRow >= mask.size) {
+        blocked += 1;
+        continue;
+      }
+      if (!mask.walkable[nextRow * mask.size + nextCol]) blocked += 1;
+    }
+  }
+  return blocked * 0.08;
+}
+
+function findRasterRoute(mask: RouteMask, from: RasterCell, to: RasterCell) {
+  const start = nearestWalkableCell(mask, from);
+  const end = nearestWalkableCell(mask, to);
+  const startIndex = rasterIndex(mask, start);
+  const endIndex = rasterIndex(mask, end);
+  if (startIndex === endIndex) return [start, end];
+
+  const total = mask.size * mask.size;
+  const costs = new Float32Array(total);
+  const scores = new Float32Array(total);
+  const previous = new Int32Array(total);
+  const visited = new Uint8Array(total);
+  const inOpen = new Uint8Array(total);
+  costs.fill(Number.POSITIVE_INFINITY);
+  scores.fill(Number.POSITIVE_INFINITY);
+  previous.fill(-1);
+
+  const open = [startIndex];
+  costs[startIndex] = 0;
+  scores[startIndex] = Math.hypot(end.col - start.col, end.row - start.row);
+  inOpen[startIndex] = 1;
+
+  const neighbors = [
+    [-1, 0, 1], [1, 0, 1], [0, -1, 1], [0, 1, 1],
+    [-1, -1, 1.42], [1, -1, 1.42], [-1, 1, 1.42], [1, 1, 1.42],
+  ] as const;
+
+  while (open.length) {
+    let openPosition = 0;
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < open.length; index += 1) {
+      const score = scores[open[index]];
+      if (score < bestScore) {
+        bestScore = score;
+        openPosition = index;
+      }
+    }
+
+    const currentIndex = open.splice(openPosition, 1)[0];
+    inOpen[currentIndex] = 0;
+    if (currentIndex === endIndex) break;
+    if (visited[currentIndex]) continue;
+    visited[currentIndex] = 1;
+
+    const currentCol = currentIndex % mask.size;
+    const currentRow = Math.floor(currentIndex / mask.size);
+    for (const [dx, dy, stepCost] of neighbors) {
+      const nextCol = currentCol + dx;
+      const nextRow = currentRow + dy;
+      if (nextCol < 0 || nextRow < 0 || nextCol >= mask.size || nextRow >= mask.size) continue;
+      const nextIndex = nextRow * mask.size + nextCol;
+      if (visited[nextIndex] || !mask.walkable[nextIndex]) continue;
+      const candidate = costs[currentIndex] + stepCost + routePenalty(mask, nextCol, nextRow);
+      if (candidate >= costs[nextIndex]) continue;
+      previous[nextIndex] = currentIndex;
+      costs[nextIndex] = candidate;
+      scores[nextIndex] = candidate + Math.hypot(end.col - nextCol, end.row - nextRow);
+      if (!inOpen[nextIndex]) {
+        open.push(nextIndex);
+        inOpen[nextIndex] = 1;
+      }
+    }
+  }
+
+  if (previous[endIndex] === -1) return hasLineOfSight(mask, start, end) ? [start, end] : [start];
+
+  const cells: RasterCell[] = [];
+  let current = endIndex;
+  while (current !== -1) {
+    cells.push({ col: current % mask.size, row: Math.floor(current / mask.size) });
+    if (current === startIndex) break;
+    current = previous[current];
+  }
+  return simplifyRasterPath(mask, cells.reverse());
+}
+
+function buildImageRoutePlan(map: MapPlan, tactic: Tactic, mask: RouteMask) {
+  const pointsById = new Map(map.points.map((item) => [item.id, item]));
+  const markers = new Map<string, ImageRouteMarker>();
+  const routes: ImageRoutePath[] = tactic.routes.map((route, routeIndex) => {
+    const routeWaypoints: RouteWaypoint[] = [];
+
+    route.points.forEach((id, index, routePointIds) => {
+      const pointItem = pointsById.get(id);
+      if (!pointItem) return;
+      const snapped = nearestWalkableCell(mask, pointToCell(mask, pointItem));
+      const marker = cellToWaypoint(mask, id, snapped);
+      markers.set(id, { ...marker, label: pointItem.label, kind: pointItem.kind });
+
+      if (index >= routePointIds.length - 1) return;
+      const nextPoint = pointsById.get(routePointIds[index + 1]);
+      if (!nextPoint) return;
+      const nextSnapped = nearestWalkableCell(mask, pointToCell(mask, nextPoint));
+      const leg = findRasterRoute(mask, snapped, nextSnapped).map((cell, legIndex) => (
+        cellToWaypoint(mask, `${route.label}-${routeIndex}-${index}-${legIndex}`, cell)
+      ));
+      routeWaypoints.push(...(routeWaypoints.length ? leg.slice(1) : leg));
+    });
+
+    return { label: route.label, color: route.color, points: routeWaypoints };
+  });
+
+  return {
+    markers: Array.from(markers.values()),
+    routes,
+  };
+}
+
 function Radar({ map, tactic }: { map: MapPlan; tactic: Tactic }) {
   const [missingMapImages, setMissingMapImages] = useState<Set<string>>(() => new Set());
+  const [imageRoutePlan, setImageRoutePlan] = useState<{
+    key: string;
+    markers: ImageRouteMarker[];
+    routes: ImageRoutePath[];
+  } | null>(null);
   const hasMapImage = !missingMapImages.has(map.id);
   const activeIds = new Set(tactic.routes.flatMap((route) => route.points));
+  const routePlanKey = `${map.id}:${tactic.id}`;
+  const activeImageRoutePlan = imageRoutePlan?.key === routePlanKey ? imageRoutePlan : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!hasMapImage) return () => {
+      cancelled = true;
+    };
+
+    getRouteMask(map.id).then((mask) => {
+      if (cancelled || !mask) return;
+      setImageRoutePlan({ key: routePlanKey, ...buildImageRoutePlan(map, tactic, mask) });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasMapImage, map, routePlanKey, tactic]);
+
+  const visibleMarkers = hasMapImage
+    ? activeImageRoutePlan?.markers ?? []
+    : map.points.filter((item) => activeIds.has(item.id));
 
   return (
     <div className={`radar ${hasMapImage ? "has-map-image" : ""}`} aria-label={`${map.name} 战术雷达示意`}>
@@ -2481,38 +2795,48 @@ function Radar({ map, tactic }: { map: MapPlan; tactic: Tactic }) {
       </svg>
       <div className="radar-map-name">{map.name}</div>
       <div className="radar-disclaimer">
-        {hasMapImage ? "真实地图模式 · 路线叠加" : "缺少真实地图 · 暂用备用图"}
+        {hasMapImage ? "真实底图 · 自动贴路" : "缺少真实地图 · 暂用备用图"}
       </div>
       <div className="map-area-layer" aria-hidden="true">
-        {hasMapImage
-          ? map.points.map((item) => (
-              <span
-                className={`map-area ${item.kind || "lane"}`}
-                key={item.id}
-                style={{
-                  left: `${item.x}%`,
-                  top: `${item.y}%`,
-                  transform: "translate(-50%, -50%)",
-                }}
-              >
-                {item.label}
-              </span>
-            ))
-          : map.areas.map((item) => (
-              <span
-                className={`map-area ${item.kind || "lane"}`}
-                key={item.id}
-                style={{
-                  left: `${item.x + item.w / 2}%`,
-                  top: `${item.y + item.h / 2}%`,
-                  transform: `translate(-50%, -50%) rotate(${item.rotate ?? 0}deg)`,
-                }}
-              >
-                {item.label}
-              </span>
-            ))}
+        {!hasMapImage && map.areas.map((item) => (
+          <span
+            className={`map-area ${item.kind || "lane"}`}
+            key={item.id}
+            style={{
+              left: `${item.x + item.w / 2}%`,
+              top: `${item.y + item.h / 2}%`,
+              transform: `translate(-50%, -50%) rotate(${item.rotate ?? 0}deg)`,
+            }}
+          >
+            {item.label}
+          </span>
+        ))}
       </div>
-      {tactic.routes.map((route) => (
+      {hasMapImage && activeImageRoutePlan ? (
+        <svg aria-hidden="true" className="route-svg-layer" preserveAspectRatio="none" viewBox="0 0 100 100">
+          {activeImageRoutePlan.routes.map((route) => {
+            const routePoints = route.points.map((item) => `${item.x.toFixed(2)},${item.y.toFixed(2)}`).join(" ");
+            const endPoint = route.points.at(-1);
+            if (!routePoints || !endPoint) return null;
+            return (
+              <g key={route.label}>
+                <polyline
+                  className="route-path"
+                  points={routePoints}
+                  stroke={route.color}
+                />
+                <circle
+                  className="route-end-dot"
+                  cx={endPoint.x}
+                  cy={endPoint.y}
+                  fill={route.color}
+                  r="1.25"
+                />
+              </g>
+            );
+          })}
+        </svg>
+      ) : !hasMapImage ? tactic.routes.map((route) => (
         <div className="route-layer" key={route.label}>
           {routeSegments(map, route).map(([from, to], index, segments) => (
             <span
@@ -2522,10 +2846,10 @@ function Radar({ map, tactic }: { map: MapPlan; tactic: Tactic }) {
             />
           ))}
         </div>
-      ))}
-      {map.points.map((item) => (
+      )) : null}
+      {visibleMarkers.map((item) => (
         <button
-          className={`radar-point ${item.kind || "lane"} ${activeIds.has(item.id) ? "active" : ""}`}
+          className={`radar-point ${item.kind || "lane"} active ${hasMapImage ? "calibrated" : ""}`}
           key={item.id}
           style={{ left: `${item.x}%`, top: `${item.y}%` }}
           type="button"
