@@ -47,7 +47,7 @@ npm run build:pages
 
 ## 说明
 
-这是非官方粉丝工具。当前版本默认使用第三方整理的真实 CS2 雷达 PNG 作为底图，并在其上叠加本站自己的战术路线与点位；图片来源见 `public/maps/SOURCES.md`。
+这是非官方粉丝工具。当前版本默认使用第三方整理的真实 CS2 雷达 PNG 作为底图，并在其上叠加本站自己的战术路线示意。真实底图模式下只显示经过校准的 T/CT 出生点和 A/B 包点锚点；中间点位保留在战术文字里，不再作为精确地图标记显示。图片与锚点来源见 `public/maps/SOURCES.md`。
 
 如果你想替换图片，可以把新的雷达图放到 `public/maps/`，命名为 `mirage.png`、`inferno.png`、`nuke.png`、`ancient.png`、`anubis.png`、`dust2.png`、`cache.png`、`overpass.png`、`train.png`。页面会自动显示这些底图，再叠加战术路线和点位。
 
