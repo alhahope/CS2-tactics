@@ -120,16 +120,16 @@ const sides: Side[] = ["T", "CT"];
 const routeColors = ["#ff7a3d", "#44d7a8", "#7cc9ff", "#f6d65f"];
 const rasterGridSize = 128;
 const routeMaskCache = new Map<string, Promise<RouteMask | null>>();
-const verifiedRadarAnchorsByMap: Record<string, readonly string[]> = {
-  mirage: ["t", "ct", "a", "b"],
-  inferno: ["t", "ct", "a", "b"],
-  nuke: ["t", "ct", "a", "b"],
-  ancient: ["t", "ct", "a", "b"],
-  anubis: ["t", "ct", "a", "b"],
-  dust2: ["t", "ct", "a", "b"],
-  cache: ["t", "ct", "a", "b"],
-  overpass: ["t", "ct", "a", "b"],
-  train: ["t", "ct", "a", "b"],
+const calibratedRadarPointsByMap: Record<string, readonly string[]> = {
+  mirage: ["t", "ramp", "a", "palace", "mid", "connector", "short", "b", "apps", "ct", "window", "market"],
+  inferno: ["t", "banana", "logs", "b", "mid", "arch", "alt", "second", "a", "ct", "library", "pit"],
+  nuke: ["t", "yard", "secret", "b", "hut", "a", "ramp", "squeaky", "ct", "garage", "vents", "silo"],
+  ancient: ["t", "red", "mid", "donut", "a", "lane", "ramp", "b", "ct", "cave"],
+  anubis: ["t", "canal", "bridge", "a", "a-main", "b-main", "b", "connector", "ct", "mid"],
+  dust2: ["t", "long", "pit", "a", "mid", "short", "doors", "b-tun", "b", "ct", "car"],
+  cache: ["t", "mid", "vents", "a", "a-main", "b-main", "b", "ct", "truck", "squeaky", "heaven"],
+  overpass: ["t", "fountain", "toilets", "a", "long", "connector", "water", "b", "monster", "ct", "bank"],
+  train: ["t", "main", "outer", "a", "ivy", "ladder", "inner", "b", "ct", "pop", "heaven"],
 };
 
 const point = (id: string, label: string, x: number, y: number, kind: Point["kind"] = "lane"): Point => ({ id, label, x, y, kind });
@@ -159,9 +159,9 @@ const baseMaps: BaseMapPlan[] = [
     tNote: "先问自己：中路有没有拿到窗口/拱门压力。",
     ctNote: "A 区不要只蹲包点，中路信息断了 B 和 A 都会难守。",
     points: [
-      point("t", "T 出生点", 87, 36, "spawn"), point("ramp", "A 坡", 20, 50), point("palace", "二楼", 31, 19),
-      point("mid", "中路", 50, 48), point("window", "窗口", 47, 34, "danger"), point("connector", "拱门", 47, 45),
-      point("short", "短箱", 63, 49), point("apps", "B 二楼", 78, 73), point("market", "超市", 70, 62),
+      point("t", "T 出生点", 87, 36, "spawn"), point("ramp", "A 坡", 61, 69), point("palace", "二楼", 73, 78),
+      point("mid", "中路", 52, 47), point("window", "窗口", 39, 47, "danger"), point("connector", "拱门", 43, 56),
+      point("short", "短箱", 53, 39), point("apps", "B 二楼", 28, 17), point("market", "超市", 22, 47),
       point("a", "A 包点", 54, 76, "site"), point("b", "B 包点", 23, 28, "site"), point("ct", "警家", 28, 70, "spawn"),
     ],
     tactics: [
@@ -230,10 +230,10 @@ const baseMaps: BaseMapPlan[] = [
     tNote: "别五个人堵一个口，香蕉道和二楼至少要有一边拿到空间。",
     ctNote: "B 区道具要分层交，A 区二楼不能长期没人听。",
     points: [
-      point("t", "T 出生点", 10, 67, "spawn"), point("banana", "香蕉道", 82, 60), point("logs", "木桶", 78, 54),
-      point("b", "B 包点", 49, 22, "site"), point("ct", "CT", 90, 35, "spawn"), point("mid", "中路", 49, 67),
-      point("second", "二楼", 37, 48), point("arch", "拱门", 60, 35), point("library", "书房", 55, 28),
-      point("a", "A 包点", 81, 69, "site"), point("pit", "大坑", 43, 23, "danger"), point("alt", "侧道", 34, 67),
+      point("t", "T 出生点", 10, 67, "spawn"), point("banana", "香蕉道", 42, 47), point("logs", "木桶", 46, 36),
+      point("b", "B 包点", 49, 22, "site"), point("ct", "CT", 90, 35, "spawn"), point("mid", "中路", 47, 65),
+      point("second", "二楼", 68, 86), point("arch", "拱门", 74, 50), point("library", "书房", 89, 58),
+      point("a", "A 包点", 81, 69, "site"), point("pit", "大坑", 90, 87, "danger"), point("alt", "侧道", 35, 79),
     ],
     tactics: [
       {
@@ -301,7 +301,7 @@ const baseMaps: BaseMapPlan[] = [
     ctNote: "信息比枪法重要，外场失守要第一时间叫 B 层轮转。",
     points: [
       point("t", "T 出生点", 19, 54, "spawn"), point("yard", "外场", 50, 64), point("secret", "K1", 68, 73),
-      point("garage", "车库", 49, 54, "danger"), point("silo", "红箱", 47, 56), point("hut", "黄房", 61, 40),
+      point("garage", "车库", 57, 67, "danger"), point("silo", "红箱", 47, 57), point("hut", "黄房", 58, 40),
       point("squeaky", "铁门", 70, 43), point("a", "A 包点", 58, 48, "site"), point("vents", "管道", 65, 57),
       point("ramp", "铁板", 76, 64), point("b", "B 包点", 58, 58, "site"), point("ct", "CT", 82, 45, "spawn"),
     ],
@@ -371,8 +371,8 @@ const baseMaps: BaseMapPlan[] = [
     ctNote: "中路不能免费给，B 坡需要道具拖时间。",
     points: [
       point("t", "T 出生点", 48.5, 87, "spawn"), point("red", "红房", 33, 69), point("mid", "中路", 50, 56),
-      point("donut", "甜甜圈", 40, 50), point("a", "A 包点", 31, 25, "site"), point("cave", "洞口", 65, 55, "danger"),
-      point("ramp", "B 坡", 80, 70), point("b", "B 包点", 80, 40, "site"), point("ct", "CT", 51, 17, "spawn"),
+      point("donut", "甜甜圈", 29, 46), point("a", "A 包点", 31, 25, "site"), point("cave", "洞口", 65, 55, "danger"),
+      point("ramp", "B 坡", 82, 60), point("b", "B 包点", 80, 40, "site"), point("ct", "CT", 51, 17, "spawn"),
       point("lane", "长廊", 24, 54),
     ],
     tactics: [
@@ -440,10 +440,10 @@ const baseMaps: BaseMapPlan[] = [
     tNote: "控水路后不要犹豫，A/B 两边都能二次夹击。",
     ctNote: "水路丢了就要主动换空间，不能五个人缩包点。",
     points: [
-      point("t", "T 出生点", 58, 93, "spawn"), point("canal", "水路", 41, 60), point("mid", "中路", 50, 50),
-      point("bridge", "桥", 68, 29), point("a-main", "A 主", 32, 47), point("a", "A 包点", 31, 50, "site"),
-      point("b-main", "B 主", 74, 48), point("b", "B 包点", 76, 28, "site"), point("ct", "CT", 61, 22, "spawn"),
-      point("connector", "连接", 62, 57),
+      point("t", "T 出生点", 48, 89, "spawn"), point("canal", "水路", 58, 64), point("mid", "中路", 53, 52),
+      point("bridge", "桥", 48, 64), point("a-main", "A 主", 82, 55), point("a", "A 包点", 76, 27, "site"),
+      point("b-main", "B 主", 31, 58), point("b", "B 包点", 31, 50, "site"), point("ct", "CT", 43, 22, "spawn"),
+      point("connector", "连接", 64, 48),
     ],
     tactics: [
       {
@@ -509,10 +509,10 @@ const baseMaps: BaseMapPlan[] = [
     tNote: "A 大和 A 小最好同时有压力，B 洞爆点要快。",
     ctNote: "开局 A 大信息很关键，中门不能无声丢。",
     points: [
-      point("t", "T 出生点", 39, 91, "spawn"), point("long", "A 大", 18, 46), point("pit", "大坑", 18, 30, "danger"),
-      point("short", "A 小", 36, 39), point("mid", "中路", 50, 57), point("doors", "中门", 55, 38),
-      point("b-tun", "B 洞", 83, 70), point("b", "B 包点", 21, 12, "site"), point("a", "A 包点", 80, 16, "site"),
-      point("ct", "CT", 62, 21, "spawn"), point("car", "A 车", 24, 33),
+      point("t", "T 出生点", 39, 91, "spawn"), point("long", "A 大", 81, 44), point("pit", "大坑", 89, 64, "danger"),
+      point("short", "A 小", 60, 37), point("mid", "中路", 50, 54), point("doors", "中门", 47, 36),
+      point("b-tun", "B 洞", 13, 46), point("b", "B 包点", 21, 12, "site"), point("a", "A 包点", 80, 16, "site"),
+      point("ct", "CT", 62, 21, "spawn"), point("car", "A 车", 91, 23),
     ],
     tactics: [
       {
@@ -578,10 +578,10 @@ const baseMaps: BaseMapPlan[] = [
     tNote: "中路要和 A 主/B 仓形成同步，不要单人孤立控中。",
     ctNote: "中路一丢要主动收缩，包点别被两边同时夹。",
     points: [
-      point("t", "T 出生点", 88.7, 58.5, "spawn"), point("a-main", "A 主", 23, 62), point("squeaky", "门房", 41, 45),
-      point("mid", "中路", 50, 56), point("vents", "通风管", 53, 46), point("b-main", "B 仓", 79, 65),
-      point("a", "A 包点", 32.5, 26, "site"), point("b", "B 包点", 34.5, 79, "site"), point("truck", "车位", 42, 33),
-      point("heaven", "二楼", 72, 55), point("ct", "CT", 9.775, 47.3, "spawn"),
+      point("t", "T 出生点", 88.7, 58.5, "spawn"), point("a-main", "A 主", 40, 35), point("squeaky", "门房", 41, 22),
+      point("mid", "中路", 46, 50), point("vents", "通风管", 36, 64), point("b-main", "B 仓", 40, 72),
+      point("a", "A 包点", 32.5, 26, "site"), point("b", "B 包点", 34.5, 79, "site"), point("truck", "车位", 14, 41),
+      point("heaven", "二楼", 20, 72), point("ct", "CT", 9.775, 47.3, "spawn"),
     ],
     tactics: [
       {
@@ -648,10 +648,10 @@ const baseMaps: BaseMapPlan[] = [
     tNote: "厕所慢控和下水道夹 B 都要有耐心。",
     ctNote: "前压信息很值钱，但死了会让回防很远。",
     points: [
-      point("t", "T 出生点", 66, 93, "spawn"), point("fountain", "喷泉", 40, 73), point("toilets", "厕所", 43, 57),
-      point("long", "A 长", 30, 48), point("a", "A 包点", 55, 23, "site"), point("connector", "连接", 51, 52),
-      point("water", "短水", 61, 75), point("monster", "怪兽", 77, 82), point("b", "B 包点", 70, 31, "site"),
-      point("bank", "银行", 52, 17), point("ct", "CT", 49, 20, "spawn"),
+      point("t", "T 出生点", 66, 93, "spawn"), point("fountain", "喷泉", 40, 73), point("toilets", "厕所", 42, 48),
+      point("long", "A 长", 20, 58), point("a", "A 包点", 55, 23, "site"), point("connector", "连接", 60, 58),
+      point("water", "短水", 57, 50), point("monster", "怪兽", 73, 42), point("b", "B 包点", 70, 31, "site"),
+      point("bank", "银行", 41, 13), point("ct", "CT", 49, 20, "spawn"),
     ],
     tactics: [
       {
@@ -717,10 +717,10 @@ const baseMaps: BaseMapPlan[] = [
     tNote: "外场烟墙能切割枪线，内场要靠爆弹一口气进。",
     ctNote: "外场别只站一条线，内场至少留反清道具。",
     points: [
-      point("t", "T 出生点", 12, 25, "spawn"), point("ivy", "绿通", 24, 20), point("main", "匪口", 40, 60),
-      point("ladder", "五道", 40, 45), point("outer", "外场", 54, 52), point("a", "A 包点", 63, 49, "site"),
-      point("pop", "六道", 72, 48), point("inner", "内场", 85, 66), point("b", "B 包点", 52, 76, "site"),
-      point("ct", "CT", 86, 77, "spawn"), point("heaven", "二楼", 74, 24, "danger"),
+      point("t", "T 出生点", 12, 25, "spawn"), point("ivy", "绿通", 77, 30), point("main", "匪口", 33, 40),
+      point("ladder", "五道", 38, 56), point("outer", "外场", 55, 42), point("a", "A 包点", 63, 49, "site"),
+      point("pop", "六道", 40, 60), point("inner", "内场", 30, 72), point("b", "B 包点", 52, 76, "site"),
+      point("ct", "CT", 86, 77, "spawn"), point("heaven", "二楼", 63, 64, "danger"),
     ],
     tactics: [
       {
@@ -2697,10 +2697,10 @@ function findRasterRoute(mask: RouteMask, from: RasterCell, to: RasterCell) {
 function buildImageRoutePlan(map: MapPlan, tactic: Tactic, mask: RouteMask) {
   const pointsById = new Map(map.points.map((item) => [item.id, item]));
   const markers = new Map<string, ImageRouteMarker>();
-  const verifiedAnchors = new Set(verifiedRadarAnchorsByMap[map.id] ?? []);
+  const calibratedPoints = new Set(calibratedRadarPointsByMap[map.id] ?? []);
   const routes: ImageRoutePath[] = tactic.routes.map((route, routeIndex) => {
     const routeWaypoints: RouteWaypoint[] = [];
-    const anchorIds = route.points.filter((id) => verifiedAnchors.has(id) && pointsById.has(id));
+    const anchorIds = route.points.filter((id) => calibratedPoints.has(id) && pointsById.has(id));
 
     anchorIds.forEach((id, index) => {
       const pointItem = pointsById.get(id);
@@ -2814,7 +2814,7 @@ function Radar({ map, tactic }: { map: MapPlan; tactic: Tactic }) {
       </svg>
       <div className="radar-map-name">{map.name}</div>
       <div className="radar-disclaimer">
-        {hasMapImage ? "官方锚点 · 路线示意" : "缺少真实地图 · 暂用备用图"}
+        {hasMapImage ? "逐点校准 · 路线一致" : "缺少真实地图 · 暂用备用图"}
       </div>
       <div className="map-area-layer" aria-hidden="true">
         {!hasMapImage && map.areas.map((item) => (

@@ -34,7 +34,7 @@ test("server-renders the CS2 stratbook landing page", async () => {
   assert.match(html, /临场战术板/);
   assert.match(text, /7 张现役图 · 108 套战术/);
   assert.match(html, /雷达/);
-  assert.match(html, /官方锚点 · 路线示意/);
+  assert.match(html, /逐点校准 · 路线一致/);
   assert.match(html, /道具清单/);
   assert.match(html, /路线图/);
   assert.match(html, /MAP DNA/);
@@ -79,7 +79,7 @@ test("keeps the tactic data and UI source complete", async () => {
   assert.match(page, /route-svg-layer/);
   assert.match(page, /function findRasterRoute/);
   assert.match(page, /function buildImageRoutePlan/);
-  assert.match(page, /verifiedRadarAnchorsByMap/);
+  assert.match(page, /calibratedRadarPointsByMap/);
   assert.match(page, /routeGraphsByMap/);
   assert.match(page, /function guidedLeg/);
   assert.match(page, /mapIntelByMap/);

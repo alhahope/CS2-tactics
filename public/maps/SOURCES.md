@@ -1,4 +1,4 @@
-# 地图图片与锚点来源
+# 地图图片与路线点校准来源
 
 当前页面默认使用 `MurkyYT/cs2-map-icons` 整理的 CS2 雷达 PNG 作为底图，并在其上叠加本站自己的战术路线示意。
 
@@ -16,16 +16,17 @@
 - `overpass.png`
 - `train.png`
 
-## 锚点校准
+## 路线点校准
 
-真实底图模式下，只把 T 出生点、CT 出生点、A 包点、B 包点作为可视化锚点。大部分锚点来自同仓库 `data/radar_info/de_*.txt` 的 overview 数据。
+真实底图模式下，战术路线实际用到的点位会参与地图连线。T/CT 出生点和 A/B 包点优先参考同仓库 `data/radar_info/de_*.txt` 的 overview 数据，并用雷达图上的出生区/包点框做视觉复核。
 
-Anubis 的 `radar_info` 文件只提供了 T/CT 出生点；A/B 包点按同一张雷达图上的橙色包点标识做了目视校准。其他中间点位仍用于战术文字说明，但不会在真实底图上当作精确坐标显示。
+中间路线点参考 `TotalCS` 的同朝向 callout 标注图逐图目视校准，再落到本站使用的 `MurkyYT/cs2-map-icons` 雷达底图坐标系。Nuke 因为上下层叠图问题，A/B 包点保留 overview 的综合雷达位置，中间点按当前综合雷达通道校准。
 
 ## 来源链接
 
 - https://github.com/MurkyYT/cs2-map-icons
 - https://github.com/mwridgway/CS2Callouts
+- https://totalcsgo.com/callouts
 
 ## 备注
 
