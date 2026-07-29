@@ -31,11 +31,12 @@ npm test
 
 ## GitHub Pages 部署
 
-项目已经包含 `.github/workflows/pages.yml`。推送到 GitHub 后：
+项目已经包含 `.github/workflows/pages.yml`。推送到 GitHub 后会自动构建静态站点，并刷新 `gh-pages` 分支。
 
 1. 打开仓库 Settings → Pages
-2. Source 选择 GitHub Actions
-3. 推送到 `main` 后自动部署
+2. Source 选择 Deploy from a branch
+3. Branch 选择 `gh-pages` / root
+4. 保存后等待 GitHub Pages 发布
 
 如果要本地生成 GitHub Pages 静态文件：
 
